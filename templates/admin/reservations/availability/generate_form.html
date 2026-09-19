@@ -1,0 +1,127 @@
+{% extends "admin/base_site.html" %}
+
+{% load admin_urls i18n unfold %}
+
+{% block bodyclass %}{{ block.super }} {{ opts.app_label }}-{{ opts.model_name }} change-form{% endblock %}
+
+{% block breadcrumbs %}{% if not is_popup %}
+    <div class="px-4">
+        <div class="container mb-6 mx-auto -my-3 lg:mb-12">
+            <ul class="flex flex-wrap">
+                {% url 'admin:index' as link %}
+                {% include 'unfold/helpers/breadcrumb_item.html' with link=link name=_('Home') %}
+                {% url 'admin:reservations_availability_changelist' as link %}
+                {% include 'unfold/helpers/breadcrumb_item.html' with link=link name=opts.verbose_name_plural|capfirst %}
+                {% include 'unfold/helpers/breadcrumb_item.html' with link='' name=title %}
+            </ul>
+        </div>
+    </div>
+{% endif %}{% endblock %}
+
+{% block content %}
+    <div id="content-main">
+        <form method="post" id="availability_generate_form" novalidate>
+            {% csrf_token %}
+
+            {% include "unfold/helpers/messages/errornote.html" with errors=form.errors %}
+            {% include "unfold/helpers/form_errors.html" with errors=form.non_field_errors %}
+
+            {% include "unfold/helpers/messages/info.html" with message="Tanlangan oylarning har bir kuni uchun bo'sh vaqt yaratiladi. Restoranda — tanlangan xona uchun, to'yxonada — belgilangan zallar uchun (hech biri belgilanmasa, barcha zallar). Mavjud kunlar o'zgarmaydi." %}
+
+            <fieldset class="border border-base-200 mb-8 rounded-default p-3 shadow-xs dark:border-base-800">
+                {% include "unfold/helpers/field.html" with field=form.business %}
+
+                <div id="room-block">
+                    {% include "unfold/helpers/field.html" with field=form.room %}
+                </div>
+
+                <div id="halls-block" class="{% if form.halls.errors %}errors {% endif %}form-field flex flex-col group mb-4">
+                    {% include "unfold/helpers/form_label.html" with field=form.halls %}
+                    {# Zallar ro'yxatini JS tanlangan biznes bo'yicha to'ldiradi. #}
+                    <div id="halls-list" class="flex flex-col gap-2 mt-2"></div>
+                    {% include "unfold/helpers/form_errors.html" with errors=form.halls.errors %}
+                    {% include "unfold/helpers/help_text.html" with help_text=form.halls.help_text %}
+                </div>
+
+                <div class="grid gap-4 md:grid-cols-2">
+                    {% include "unfold/helpers/field.html" with field=form.start_time %}
+                    {% include "unfold/helpers/field.html" with field=form.end_time %}
+                </div>
+
+                {% include "unfold/helpers/field.html" with field=form.year %}
+                {% include "unfold/helpers/field.html" with field=form.months %}
+
+                <div class="border-t border-base-200 flex flex-wrap gap-2 justify-end -mx-3 pt-3 px-3 dark:border-base-800">
+                    {% component "unfold/components/button.html" with submit=1 variant="default" name="_addanother" %}
+                        Saqlab, yana qo'shish
+                    {% endcomponent %}
+                    {% component "unfold/components/button.html" with submit=1 %}
+                        Saqlash
+                    {% endcomponent %}
+                </div>
+            </fieldset>
+        </form>
+    </div>
+
+    {{ businesses_data|json_script:"businesses-data" }}
+    {{ selected_room|json_script:"selected-room" }}
+    {{ selected_halls|json_script:"selected-halls" }}
+
+    <script>
+        (function () {
+            "use strict";
+            var data = JSON.parse(document.getElementById("businesses-data").textContent);
+            var selectedRoom = JSON.parse(document.getElementById("selected-room").textContent);
+            var selectedHalls = JSON.parse(document.getElementById("selected-halls").textContent);
+
+            var business = document.getElementById("id_business");
+            var room = document.getElementById("id_room");
+            var roomBlock = document.getElementById("room-block");
+            var hallsBlock = document.getElementById("halls-block");
+            var hallsList = document.getElementById("halls-list");
+
+            function renderRooms(rooms) {
+                room.innerHTML = "";
+                room.appendChild(new Option("---------", ""));
+                rooms.forEach(function (item) {
+                    room.appendChild(new Option(item.name, item.id, false, item.id === selectedRoom));
+                });
+            }
+
+            function renderHalls(halls) {
+                hallsList.innerHTML = "";
+                if (!halls.length) {
+                    hallsList.textContent = "Bu to'yxonada hali zal yo'q — avval zal qo'shing.";
+                    return;
+                }
+                halls.forEach(function (item) {
+                    var label = document.createElement("label");
+                    label.className = "flex gap-2 items-center text-sm";
+                    var input = document.createElement("input");
+                    input.type = "checkbox";
+                    input.name = "halls";
+                    input.value = item.id;
+                    input.checked = selectedHalls.indexOf(item.id) !== -1;
+                    label.appendChild(input);
+                    label.appendChild(document.createTextNode(item.name));
+                    hallsList.appendChild(label);
+                });
+            }
+
+            function update() {
+                var info = data[business.value];
+                roomBlock.hidden = !info || info.type !== "{{ type_restaurant }}";
+                hallsBlock.hidden = !info || info.type !== "{{ type_venue }}";
+                renderRooms(info ? info.rooms : []);
+                renderHalls(info ? info.halls : []);
+            }
+
+            business.addEventListener("change", function () {
+                selectedRoom = "";
+                selectedHalls = [];
+                update();
+            });
+            update();
+        })();
+    </script>
+{% endblock %}
