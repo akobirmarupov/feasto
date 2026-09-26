@@ -2,7 +2,6 @@ import re
 from urllib.parse import quote
 
 
-
 _MIN_COORD = 0.000001
 
 
@@ -37,23 +36,15 @@ def build_map_links(*, latitude=None, longitude=None, address="", name="") -> di
     }
 
 
-
 _NUM = r"(-?\d{1,3}\.\d{3,})"
 
 _PATTERNS = (
-    # Google: .../@41.311081,69.240562,17z
     (re.compile(rf"@{_NUM},{_NUM}"), False),
-    # Google: !3d41.311081!4d69.240562
     (re.compile(rf"!3d{_NUM}!4d{_NUM}"), False),
-    # Yandex: ?ll=69.240562,41.311081  /  &pt=69.240562,41.311081
     (re.compile(rf"[?&](?:ll|pt|whatshere%5Bpoint%5D)={_NUM}(?:%2C|,){_NUM}"), True),
-    # Yandex marshrut: ?rtext=~41.311081,69.240562
     (re.compile(rf"rtext=[^&]*?{_NUM}(?:%2C|,){_NUM}"), False),
-    # Google: ?q=41.311081,69.240562  /  ?query=...  /  ?destination=...
     (re.compile(rf"[?&](?:q|query|daddr|destination|center)={_NUM}(?:%2C|,)\s*{_NUM}"), False),
-    # 2GIS: /geo/.../69.240562,41.311081
     (re.compile(rf"2gis\.[a-z]+/.*?/{_NUM},{_NUM}"), True),
-    # Oddiy matn: "41.311081, 69.240562"
     (re.compile(rf"^\s*{_NUM}\s*,\s*{_NUM}\s*$"), False),
 )
 

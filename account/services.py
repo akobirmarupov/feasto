@@ -24,7 +24,7 @@ SCOPES = "openid email profile"
 
 
 class GoogleAuthError(Exception):
-    """Token yaroqsiz yoki Google sozlamalari yo'q."""
+    pass
 
 
 def build_auth_url(*, redirect_uri, state):

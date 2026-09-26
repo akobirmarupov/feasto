@@ -13,7 +13,7 @@ class PaymentLogInline(TabularInline):
 
 @admin.register(SubscriptionPlan)
 class SubscriptionPlanAdmin(ModelAdmin):
-    list_display = ("business_type", "duration_months", "price", "price_per_month")
+    list_display = ("business_type", "duration_months", "price", "price_per_month", "trial_days")
     list_filter = ("business_type",)
     list_filter_submit = True
     search_fields = ("business_type",)
@@ -35,8 +35,6 @@ class SubscriptionAdmin(ModelAdmin):
 
     actions = ["mark_active", "mark_expired"]
 
-    # Ikkala amal ham servis orqali: muddat, to'lov jurnali va biznesning
-    # qidiruvda ko'rinishi birga yangilanadi.
     @admin.action(description="To'lovni tasdiqlash — obunani tarif muddatiga uzaytirish")
     def mark_active(self, request, queryset):
         from subscriptions.services import activate_subscription

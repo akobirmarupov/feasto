@@ -1,7 +1,6 @@
 from rest_framework.throttling import AnonRateThrottle, SimpleRateThrottle,UserRateThrottle
 
 
-
 class BurstUserThrottle(UserRateThrottle):
     scope = "burst_user"
 

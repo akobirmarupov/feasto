@@ -13,22 +13,13 @@ from common.models import BaseModel
 
 
 class Availability(BaseModel):
-    """Bitta xona (restoran) yoki bitta zal (to'yxona) uchun bir kunlik ish vaqti.
-
-    Restoranda bir kunga bir nechta bron bo'lishi mumkin (vaqtlari kesishmasa),
-    shuning uchun `is_booked` faqat to'yxona zallari uchun ishlatiladi.
-    """
 
     business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name="availabilities")
     room = models.ForeignKey(
         Room, on_delete=models.CASCADE, related_name="availabilities",
         null=True, blank=True,
-        help_text="Faqat restoran uchun.",
-    )
-    hall = models.ForeignKey(
-        Hall, on_delete=models.CASCADE, related_name="availabilities",
-        null=True, blank=True,
-        help_text="Faqat to'yxona uchun — har bir zal alohida band bo'ladi.",
+        help_text="Faqat restoran uchun. To'yxona uchun bo'sh qoldiriladi — "
+                  "to'yxonada bo'sh vaqt xona emas, butun biznes darajasida hisoblanadi.",
     )
     date = models.DateField(db_index=True)
     start_time = models.TimeField()
@@ -40,10 +31,8 @@ class Availability(BaseModel):
         verbose_name_plural = "Bo'sh vaqtlar"
         ordering = ["date", "start_time"]
         indexes = [
-            # Mijoz "shu kunga bo'sh joyi bor" deb qidirganda ishlaydigan indeks.
             models.Index(fields=["business", "date", "is_booked"], name="idx_avail_biz_date_booked"),
             models.Index(fields=["room", "date"], name="idx_avail_room_date"),
-            models.Index(fields=["hall", "date"], name="idx_avail_hall_date"),
             models.Index(fields=["date", "is_booked"], name="idx_avail_date_booked"),
         ]
         constraints = [
@@ -53,25 +42,15 @@ class Availability(BaseModel):
                 name="uniq_room_date_start_time",
             ),
             models.UniqueConstraint(
-                fields=["hall", "date", "start_time"],
-                condition=Q(hall__isnull=False),
-                name="uniq_hall_date_start_time",
-            ),
-            # Har bir yozuv yo xonaga, yo zalga tegishli — ikkalasiga ham, hech
-            # qaysisiga ham emas.
-            models.CheckConstraint(
-                condition=(
-                    Q(room__isnull=False, hall__isnull=True)
-                    | Q(room__isnull=True, hall__isnull=False)
-                ),
-                name="chk_avail_room_xor_hall",
+                fields=["business", "date", "start_time"],
+                condition=Q(room__isnull=True),
+                name="uniq_business_date_start_time_no_room",
             ),
         ]
 
     def __str__(self):
-        target = self.room or self.hall or self.business
-        name = getattr(target, "name", str(target))
-        return f"{name} — {self.date} ({self.start_time:%H:%M}-{self.end_time:%H:%M})"
+        target = self.room if self.room_id else self.business
+        return f"{target.name} — {self.date} ({self.start_time:%H:%M}-{self.end_time:%H:%M})"
 
     @property
     def ends_at_midnight(self) -> bool:
@@ -80,39 +59,32 @@ class Availability(BaseModel):
     def clean(self):
         if not self.business_id:
             return
-        errors = check_target(
-            self.business, room=self.room if self.room_id else None,
-            hall=self.hall if self.hall_id else None,
-        )
-        if errors:
-            raise ValidationError(errors)
-        if self.start_time and self.end_time and not self.ends_at_midnight and self.end_time <= self.start_time:
-            raise ValidationError({"end_time": "Tugash vaqti boshlanishdan keyin bo'lishi kerak (00:00 — yarim tun)."})
+        is_restaurant = self.business.business_type == Business.TYPE_RESTAURANT
+        if is_restaurant and not self.room_id:
+            raise ValidationError({"room": "Restoran uchun xona ko'rsatilishi shart."})
+        if not is_restaurant and self.room_id:
+            raise ValidationError({"room": "To'yxona uchun xona tanlanmaydi — bo'sh qoldiring."})
+        if self.room_id and self.room.business_id != self.business_id:
+            raise ValidationError({"room": "Bu xona ushbu biznesga tegishli emas."})
+
+        if self.start_time and self.end_time:
+            allow_midnight = not is_restaurant and self.ends_at_midnight
+            if not allow_midnight and self.end_time <= self.start_time:
+                raise ValidationError({"end_time": "Tugash vaqti boshlanishdan keyin bo'lishi kerak."})
 
     @classmethod
     def generate_for_months(
-        cls, *, business: Business, start_time, end_time, months: list[datetime.date],
-        room: Room | None = None, halls=None,
+        cls, *, business: Business, start_time, end_time,
+        months: list[datetime.date], room: Room | None = None,
     ):
-        """Tanlangan oylarning har bir kuni uchun bo'sh vaqt yaratadi.
+        is_restaurant = business.business_type == Business.TYPE_RESTAURANT
 
-        Restoranda bitta xona, to'yxonada tanlangan zallar (bo'sh bo'lsa —
-        barcha zallar) uchun. Mavjud kunlar o'tkazib yuboriladi.
-        """
-        if business.business_type == Business.TYPE_RESTAURANT:
-            errors = check_target(business, room=room, hall=None)
-            if errors:
-                raise ValidationError(errors)
-            targets = [("room", room)]
-        else:
-            halls = list(halls) if halls else list(business.halls.all())
-            if not halls:
-                raise ValidationError("Bu to'yxonada hali zal yo'q — avval zal qo'shing.")
-            for hall in halls:
-                errors = check_target(business, room=None, hall=hall)
-                if errors:
-                    raise ValidationError(errors)
-            targets = [("hall", hall) for hall in halls]
+        if is_restaurant and room is None:
+            raise ValidationError("Restoran uchun xona tanlanishi shart.")
+        if not is_restaurant and room is not None:
+            raise ValidationError("To'yxona uchun xona tanlanmaydi.")
+        if room is not None and room.business_id != business.id:
+            raise ValidationError("Bu xona ushbu biznesga tegishli emas.")
 
         all_dates = [
             datetime.date(month.year, month.month, day)
@@ -120,48 +92,28 @@ class Availability(BaseModel):
             for day in range(1, monthrange(month.year, month.month)[1] + 1)
         ]
 
-        to_create = []
-        for field, target in targets:
-            existing = set(
-                cls.objects.filter(**{field: target}, date__in=all_dates)
-                .values_list("date", flat=True)
+        target = Q(room=room) if room is not None else Q(room__isnull=True)
+        existing = set(
+            cls.objects.filter(target, business=business, date__in=all_dates)
+            .values_list("date", flat=True)
+        )
+        to_create = [
+            cls(
+                business=business, room=room, date=day,
+                start_time=start_time, end_time=end_time, is_booked=False,
             )
-            to_create.extend(
-                cls(
-                    business=business, date=day,
-                    start_time=start_time, end_time=end_time,
-                    is_booked=False, **{field: target},
-                )
-                for day in all_dates
-                if day not in existing
-            )
+            for day in all_dates
+            if day not in existing
+        ]
 
         created = cls.objects.bulk_create(to_create)
-        skipped = len(all_dates) * len(targets) - len(created)
-        return len(created), skipped
-
-
-def check_target(business, *, room, hall) -> dict:
-    """Restoran — faqat xona, to'yxona — faqat zal, ikkalasi ham shu biznesniki."""
-    if business.business_type == Business.TYPE_RESTAURANT:
-        if room is None:
-            return {"room": "Restoran uchun xona tanlanishi shart."}
-        if hall is not None:
-            return {"hall": "Restoran uchun zal tanlanmaydi — bo'sh qoldiring."}
-    else:
-        if hall is None:
-            return {"hall": "To'yxona uchun zal tanlanishi shart."}
-        if room is not None:
-            return {"room": "To'yxona uchun xona tanlanmaydi — bo'sh qoldiring."}
-    if room is not None and room.business_id != business.id:
-        return {"room": "Bu xona ushbu biznesga tegishli emas."}
-    if hall is not None and hall.business_id != business.id:
-        return {"hall": "Bu zal ushbu biznesga tegishli emas."}
-    return {}
+        return len(created), len(all_dates) - len(created)
 
 
 CANCEL_FALLBACK_WINDOW = datetime.timedelta(hours=1)
 
+
+BLOCKING_STATUSES = ("pending", "confirmed", "completed")
 
 ACTIVE_STATUSES = ("pending", "confirmed")
 
@@ -218,12 +170,10 @@ class Reservation(BaseModel):
         verbose_name_plural = "Bronlar"
         ordering = ["-created_at"]
         constraints = [
-            # Bitta zalning bitta kuniga faqat bitta faol (bekor qilinmagan) bron.
-            # Ikki so'rov bir vaqtda kelsa ham baza ikkinchisini qabul qilmaydi.
             models.UniqueConstraint(
                 fields=["availability"],
                 condition=Q(hall__isnull=False) & ~Q(status="cancelled"),
-                name="uniq_active_hall_reservation",
+                name="uniq_active_venue_reservation",
             ),
         ]
         indexes = [
@@ -251,6 +201,25 @@ class Reservation(BaseModel):
 
         start = self.start_time or availability.start_time or datetime.time(0, 0)
         naive = datetime.datetime.combine(availability.date, start)
+        if timezone.is_naive(naive):
+            return timezone.make_aware(naive, timezone.get_current_timezone())
+        return naive
+
+    def event_ends_at(self):
+        availability = self.availability
+        if availability is None:
+            return None
+
+        end = self.end_time or availability.end_time
+        if end is None:
+            return None
+
+        naive = datetime.datetime.combine(availability.date, end)
+
+        start = self.start_time or availability.start_time
+        if start is not None and end <= start:
+            naive += datetime.timedelta(days=1)
+
         if timezone.is_naive(naive):
             return timezone.make_aware(naive, timezone.get_current_timezone())
         return naive
@@ -286,12 +255,24 @@ class Reservation(BaseModel):
     def clean(self):
         if not self.business_id:
             return
+        is_restaurant = self.business.business_type == Business.TYPE_RESTAURANT
         room = self.room if self.room_id else None
         hall = self.hall if self.hall_id else None
 
-        errors = check_target(self.business, room=room, hall=hall)
-        if errors:
-            raise ValidationError(errors)
+        if is_restaurant:
+            if room is None:
+                raise ValidationError({"room": "Restoran broni uchun xona tanlanishi shart."})
+            if hall is not None:
+                raise ValidationError({"hall": "Restoran broni uchun zal tanlanmaydi."})
+        else:
+            if hall is None:
+                raise ValidationError({"hall": "To'yxona broni uchun zal tanlanishi shart."})
+            if room is not None:
+                raise ValidationError({"room": "To'yxona broni uchun xona tanlanmaydi."})
+        if room is not None and room.business_id != self.business_id:
+            raise ValidationError({"room": "Bu xona ushbu biznesga tegishli emas."})
+        if hall is not None and hall.business_id != self.business_id:
+            raise ValidationError({"hall": "Bu zal ushbu biznesga tegishli emas."})
 
         place = room or hall
         capacity = room.capacity if room else hall.people
@@ -310,8 +291,21 @@ class Reservation(BaseModel):
         availability = self.availability
         if availability.business_id != self.business_id:
             raise ValidationError({"availability": "Bu bo'sh vaqt ushbu biznesga tegishli emas."})
-        if availability.room_id != self.room_id or availability.hall_id != self.hall_id:
-            raise ValidationError({"availability": "Bu bo'sh vaqt tanlangan xona/zalga tegishli emas."})
+        if availability.room_id != self.room_id:
+            raise ValidationError({"availability": "Bu bo'sh vaqt tanlangan xonaga tegishli emas."})
+
+        if self.status == "cancelled":
+            return
+
+        if self.hall_id:
+            taken = (
+                Reservation.objects.filter(availability=availability, status__in=BLOCKING_STATUSES)
+                .exclude(pk=self.pk)
+                .exists()
+            )
+            if taken:
+                raise ValidationError({"availability": "Bu kun allaqachon band. Boshqa sanani tanlang."})
+            return
 
         if self.status not in ACTIVE_STATUSES:
             return
@@ -320,13 +314,6 @@ class Reservation(BaseModel):
             availability=availability, status__in=ACTIVE_STATUSES
         ).exclude(pk=self.pk)
 
-        if self.hall_id:
-            if others.exists():
-                raise ValidationError({"availability": "Bu zal shu kunga allaqachon band qilingan."})
-            return
-
-        # Restoran: bir kunda bir nechta bron bo'lishi mumkin, faqat vaqtlari
-        # kesishmasin va ish vaqti ichida bo'lsin.
         start, end = self._time_window()
         day_end = datetime.time.max if availability.ends_at_midnight else availability.end_time
         if start < availability.start_time or end > day_end:
@@ -345,7 +332,6 @@ class Reservation(BaseModel):
                 })
 
     def _time_window(self):
-        """Bron vaqti; kiritilmagan bo'lsa — butun ish kuni."""
         availability = self.availability
         start = self.start_time or availability.start_time
         end = self.end_time or availability.end_time

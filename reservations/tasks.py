@@ -1,45 +1,69 @@
-import datetime
+
 import logging
 
 from celery import shared_task
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 logger = logging.getLogger("reservations")
 
+BATCH_SIZE = 500
+
 
 @shared_task(name="reservations.tasks.complete_past_reservations_task")
 def complete_past_reservations_task():
+    from notifications.models import Notification
+    from notifications.services import notify
     from reservations.models import Reservation
 
-    yesterday = timezone.localdate() - datetime.timedelta(days=1)
+    now = timezone.localtime()
+    today = now.date()
 
-    queryset = Reservation.objects.filter(
-        status="confirmed", availability__date__lte=yesterday
+    ended = (
+        Q(availability__date__lt=today)
+        | Q(availability__date=today, end_time__lte=now.time())
+        | Q(
+            availability__date=today,
+            end_time__isnull=True,
+            availability__end_time__lte=now.time(),
+        )
     )
 
-    completed = 0
+    queryset = (
+        Reservation.objects.filter(status="confirmed")
+        .filter(ended)
+        .select_related("business", "user", "availability")
+        .order_by("availability__date")[:BATCH_SIZE]
+    )
+
+    finished = []
     with transaction.atomic():
-        for reservation in queryset.select_for_update(skip_locked=True).iterator(chunk_size=500):
+        for reservation in queryset.select_for_update(skip_locked=True):
+            ends_at = reservation.event_ends_at()
+            if ends_at is not None and ends_at > timezone.now():
+                continue
+
             reservation.status = "completed"
             reservation.save(update_fields=["status"])
-            completed += 1
+            finished.append(reservation)
 
-    logger.info(f"complete_past_reservations_task: {completed} ta bron yakunlandi")
-    return completed
+    for reservation in finished:
+        _ask_for_review(reservation, notify, Notification)
+
+    logger.info(f"complete_past_reservations_task: {len(finished)} ta bron yakunlandi")
+    return len(finished)
 
 
-@shared_task(name="reservations.tasks.send_reservation_notification_task")
-def send_reservation_notification_task(reservation_id):
-    from common.telegram import notify_new_reservation
-    from reservations.models import Reservation
-
-    reservation = (
-        Reservation.objects.select_related("business", "user", "room", "hall", "availability")
-        .filter(pk=reservation_id)
-        .first()
-    )
-    if reservation is None:
-        logger.warning(f"send_reservation_notification_task: bron topilmadi id={reservation_id}")
-        return False
-    return notify_new_reservation(reservation)
+def _ask_for_review(reservation, notify, Notification):
+    try:
+        notify(
+            reservation.user,
+            kind=Notification.KIND_REVIEW,
+            title="Tashrifingiz qanday o'tdi?",
+            body=f"{reservation.business.name} — bahoingizni qoldiring, "
+                 f"bu boshqa mijozlarga tanlashda yordam beradi.",
+            link_url="/bronlarim/",
+        )
+    except Exception as error:  # noqa: BLE001
+        logger.warning(f"Sharh so'rovi yuborilmadi (bron {reservation.pk}): {error}")

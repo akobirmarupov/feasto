@@ -1,4 +1,3 @@
-"""Sharhlarga bog'liq yordamchi mantiq."""
 
 import logging
 

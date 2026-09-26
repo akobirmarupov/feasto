@@ -7,7 +7,7 @@ from .models import Feedback, PlatformSettings
 @admin.register(PlatformSettings)
 class PlatformSettingsAdmin(ModelAdmin):
 
-    list_display = ("admin_telegram_username", "trial_days", "venue_deposit")
+    list_display = ("admin_telegram_username", "trial_days", "subscription_days", "venue_deposit")
 
     fieldsets = (
         ("Aloqa", {"fields": ("admin_telegram_username", "support_phone")}),
@@ -15,7 +15,7 @@ class PlatformSettingsAdmin(ModelAdmin):
             "fields": ("room_deposit_premium", "room_deposit_pro", "venue_deposit"),
             "description": "Bron qilishda mijoz oldindan to'laydigan summalar.",
         }),
-        ("Obuna", {"fields": ("trial_days",)}),
+        ("Obuna", {"fields": ("trial_days", "subscription_days")}),
     )
 
     def has_add_permission(self, request):

@@ -7,12 +7,8 @@ from decouple import Csv, config
 from .unfold_config import UNFOLD  # noqa: F401  (Django shu nom bo'yicha o'qiydi)
 
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 SECRET_KEY = config("SECRET_KEY")
 DEBUG = config("DEBUG", default=False, cast=bool)
@@ -21,13 +17,31 @@ ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1", cast=Csv(
 if DEBUG:
     ALLOWED_HOSTS = [*ALLOWED_HOSTS, "*"]
 
+if not DEBUG and not ALLOWED_HOSTS:
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "ALLOWED_HOSTS bo'sh, DEBUG esa False. Bunday holatda sayt har bir "
+        "so'rovga 400 qaytaradi. `.env` da domenlarni ko'rsating, masalan: "
+        "ALLOWED_HOSTS=api.feasto.uz,feasto.uz"
+    )
+
+if not DEBUG and (SECRET_KEY.startswith("django-insecure-") or len(SECRET_KEY) < 40):
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "SECRET_KEY ishlab chiqish uchun yaratilgan (yoki juda qisqa). "
+        "Productionda uzun tasodifiy kalit kerak. Yangisini yarating: "
+        'python -c "from django.core.management.utils import '
+        'get_random_secret_key; print(get_random_secret_key())"'
+    )
+
 AUTH_USER_MODEL = "account.User"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
-# Application definition
 DJANGO_APPS = [
     "unfold",
     'django.contrib.admin',
@@ -93,8 +107,6 @@ TEMPLATES = [
     },
 ]
 
-# Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
     "default": {
@@ -107,16 +119,12 @@ DATABASES = {
         "CONN_MAX_AGE": config("DB_CONN_MAX_AGE", default=60, cast=int),
         "CONN_HEALTH_CHECKS": True,
         "OPTIONS": {
-            # Bitta so'rov bazani abadiy band qilib turmasligi uchun.
             "connect_timeout": 10,
             "options": "-c statement_timeout=15000",
         },
     }
 }
 
-
-# Password validation
-# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -129,8 +137,6 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
-# Argon2 — Django tavsiya qiladigan eng kuchli hasher. bcrypt/PBKDF2 zaxira
-# sifatida qoladi, shunda eski parollar birinchi kirishda avtomatik yangilanadi.
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.Argon2PasswordHasher",
     "django.contrib.auth.hashers.PBKDF2PasswordHasher",
@@ -142,8 +148,6 @@ PASSWORD_HASHERS = [
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=config("JWT_ACCESS_MINUTES", default=60, cast=int)),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=config("JWT_REFRESH_DAYS", default=30, cast=int)),
-    # Refresh ishlatilganda yangisi beriladi va eskisi qora ro'yxatga tushadi —
-    # o'g'irlangan refresh token cheksiz ishlatilmasligi uchun.
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": True,
@@ -176,31 +180,18 @@ REST_FRAMEWORK = {
         "common.throttles.SustainedAnonThrottle",
     ),
     "DEFAULT_THROTTLE_RATES": {
-        # Ikki qatlamli cheklov: qisqa portlash (bot/skript) alohida,
-        # kunlik umumiy hajm alohida ushlanadi.
         "burst_user": "120/min",
         "sustained_user": "5000/day",
         "burst_anon": "40/min",
         "sustained_anon": "1000/day",
 
-        # Og'ir yoki xavfli amallar uchun aniq cheklovlar.
-        #
-        # `login` — Google orqali kirishga ham tegishli. Cheklov o'sha
-        # yerda ham kerak: Google tokeni har safar tarmoq orqali
-        # tekshiriladi, ya'ni cheksiz so'rov Google kvotasini yeb
-        # qo'yardi.
-        #
-        # `register`, `sms_send`, `sms_verify` olib tashlandi —
-        # bunday endpointlar endi yo'q.
         "login": "10/min",
         "reservation_create": "10/hour",
         "business_application": "3/day",
         "review_create": "20/day",
 
-        # Taklif — kirish talab qilinmaydi, shuning uchun cheklov qattiqroq.
         "feedback": "10/day",
     },
-    # DEBUG'da brauzerdan sinash qulay, productionda faqat JSON.
     "DEFAULT_RENDERER_CLASSES": (
         ("rest_framework.renderers.JSONRenderer",)
         if not DEBUG
@@ -219,20 +210,11 @@ SPECTACULAR_SETTINGS = {
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
     "SCHEMA_PATH_PREFIX": "/api",
-    # `category` nomi ikki joyda (menyu turkumi va yangilik turkumi) uchraydi —
-    # schema'da avtomatik nom to'qnashmasligi uchun aniq nom beramiz.
-    # Bir xil nomli maydonlar (`status`, `category`) har xil variantlar
-    # to'plamiga ega — nomlarni qo'lda ajratmasak, hujjatda "Status2c5Enum"
-    # kabi o'qib bo'lmaydigan nomlar paydo bo'ladi.
     "ENUM_NAME_OVERRIDES": {
         "MenuCategoryEnum": "catalog.models.MenuCategory.choices",
         "NewsCategoryEnum": "content.models.News.CATEGORY_CHOICES",
         "ReservationStatusEnum": "reservations.models.Reservation.STATUS_CHOICES",
         "SubscriptionStatusEnum": "subscriptions.models.Subscription.STATUS_CHOICES",
-        # Ariza va obuna so'rovi AYNAN bir xil holatlarga ega
-        # (to'lov kutilmoqda / tasdiqlangan / rad etilgan), shuning uchun
-        # ikkalasiga bitta nom beriladi — aks holda drf-spectacular
-        # "bir to'plamga ikki nom" deb ogohlantiradi.
         "ApprovalStatusEnum": "businesses.models.BusinessApplication.STATUS_CHOICES",
     },
 }
@@ -250,8 +232,6 @@ CACHES = {
             "CONNECTION_POOL_KWARGS": {"max_connections": 100, "retry_on_timeout": True},
             "SOCKET_CONNECT_TIMEOUT": 3,
             "SOCKET_TIMEOUT": 3,
-            # Redis o'chib qolsa sayt ham o'lmasin — kesh shunchaki
-            # "bo'sh" bo'lib qoladi va so'rovlar bazaga tushadi.
             "IGNORE_EXCEPTIONS": True,
         },
         "KEY_PREFIX": "feasto",
@@ -299,9 +279,8 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
 
-# Yuklanadigan ma'lumot hajmi — xotira bilan DoS qilishning oldini oladi.
-DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024   # 10 MB
-FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024    # 5 MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000
 
 if config("USE_PROXY_SSL_HEADER", default=not DEBUG, cast=bool):
@@ -309,7 +288,7 @@ if config("USE_PROXY_SSL_HEADER", default=not DEBUG, cast=bool):
 
 if not DEBUG:
     SECURE_SSL_REDIRECT = config("SECURE_SSL_REDIRECT", default=True, cast=bool)
-    SECURE_HSTS_SECONDS = 31536000  # 1 yil
+    SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
     SESSION_COOKIE_SECURE = True
@@ -320,8 +299,8 @@ if not DEBUG:
     CSRF_COOKIE_SAMESITE = "Lax"
 
 
-TELEGRAM_BOT_TOKEN = config("TELEGRAM_BOT_TOKEN", default="")
-TELEGRAM_ADMIN_CHAT_ID = config("TELEGRAM_ADMIN_CHAT_ID", default="")
+TRIAL_DAYS = config("TRIAL_DAYS", default=7, cast=int)
+SUBSCRIPTION_DAYS = config("SUBSCRIPTION_DAYS", default=30, cast=int)
 
 
 GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID", default="")
@@ -330,8 +309,6 @@ GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID", default="")
 GOOGLE_CLIENT_SECRET = config("GOOGLE_CLIENT_SECRET", default="")
 
 
-# Internationalization
-# https://docs.djangoproject.com/en/5.2/topics/i18n/
 LANGUAGE_CODE = "uz"
 TIME_ZONE = "Asia/Tashkent"
 USE_I18N = True
@@ -367,9 +344,6 @@ if config("USE_S3", default=False, cast=bool):
     AWS_QUERYSTRING_AUTH = False
 
 
-# Email
-# https://docs.djangoproject.com/en/5.2/topics/email/#topic-email-configuration
-
 EMAIL_BACKEND = config(
     "EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend"
 )
@@ -378,6 +352,8 @@ EMAIL_BACKEND = config(
 LOG_DIR = BASE_DIR / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 LOG_LEVEL = config("LOG_LEVEL", default="INFO")
+
+CONSOLE_LOG_LEVEL = config("CONSOLE_LOG_LEVEL", default="INFO" if DEBUG else "WARNING")
 
 LOGGING = {
     "version": 1,
@@ -395,6 +371,7 @@ LOGGING = {
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
+            "level": CONSOLE_LOG_LEVEL,
             "formatter": "verbose",
             "filters": ["request_id"],
         },
@@ -421,7 +398,6 @@ LOGGING = {
         "django": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
         "django.security": {"handlers": ["security_file", "console"], "level": "INFO", "propagate": False},
         "django.request": {"handlers": ["file", "console"], "level": "ERROR", "propagate": False},
-        # Loyihaning o'z ilovalari
         "account": {"handlers": ["console", "file"], "level": LOG_LEVEL, "propagate": False},
         "businesses": {"handlers": ["console", "file"], "level": LOG_LEVEL, "propagate": False},
         "catalog": {"handlers": ["console", "file"], "level": LOG_LEVEL, "propagate": False},

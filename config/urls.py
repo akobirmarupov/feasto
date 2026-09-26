@@ -9,15 +9,6 @@ from drf_spectacular.views import (
 )
 
 api_patterns = [
-    # path("", include("account.urls")),
-    # path("", include("common.urls")),
-    # path("", include("businesses.urls")),
-    # path("", include("catalog.urls")),
-    # path("", include("reservations.urls")),
-    # path("", include("reviews.urls")),
-    # path("", include("subscriptions.urls")),
-    # path("", include("content.urls")),
-    # path("", include("notifications.urls")),
 ]
 
 urlpatterns = [
@@ -27,7 +18,6 @@ urlpatterns = [
     path("api/", include(api_patterns)),
 
 
-    # --- API hujjatlari ---
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("swagger/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
     path("redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),

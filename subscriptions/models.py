@@ -18,6 +18,7 @@ class SubscriptionPlan(BaseModel):
         max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal(0))],
         verbose_name="Narx", help_text="Shu muddat uchun TO'LIQ summa.",
     )
+    trial_days = models.PositiveIntegerField(default=7, verbose_name="Bepul sinov (kun)")
 
     class Meta:
         ordering = ["business_type", "duration_months"]

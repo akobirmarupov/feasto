@@ -16,12 +16,15 @@ DEFAULT_PRICES = {
 
 
 def get_or_create_plan(business_type, duration_months=1):
+    from common.models import PlatformSettings
+
+    platform = PlatformSettings.get_solo()
     fallback = DEFAULT_PRICES.get(business_type, {}).get(duration_months, 250000 * duration_months)
 
     plan, created = SubscriptionPlan.objects.get_or_create(
         business_type=business_type,
         duration_months=duration_months,
-        defaults={"price": fallback},
+        defaults={"price": fallback, "trial_days": platform.trial_days},
     )
     if created:
         logger.info(
@@ -32,7 +35,7 @@ def get_or_create_plan(business_type, duration_months=1):
 
 
 class TrialAlreadyUsed(Exception):
-    """Bepul sinov allaqachon ishlatilgan — ikkinchi marta berilmaydi."""
+    pass
 
 
 @transaction.atomic
@@ -43,13 +46,9 @@ def start_trial(*, business):
             "Bu foydalanuvchi bepul sinovni allaqachon ishlatgan."
         )
 
-    from common.models import PlatformSettings
-
     plan = get_or_create_plan(business.business_type)
-    trial_ends_at = timezone.now() + timedelta(days=PlatformSettings.get_solo().trial_days)
+    trial_ends_at = timezone.now() + timedelta(days=plan.trial_days)
 
-    # Obuna yozuvi avvaldan bo'lishi mumkin (masalan, muddati o'tgan) —
-    # u holda ham sinov haqiqatan boshlanishi kerak, shuning uchun yangilaymiz.
     subscription, _ = Subscription.objects.update_or_create(
         business=business,
         defaults={
@@ -89,9 +88,6 @@ def activate_subscription(*, business, approved_by, amount=None, note="", plan=N
 
     subscription = getattr(business, "subscription", None)
     if subscription is None:
-        # Obuna yo'q — SINOVSIZ yaratamiz. Ilgari bu yerda `start_trial`
-        # chaqirilardi va pul to'lagan odamga ustiga yana 7 bepul kun
-        # qo'shilib ketardi.
         subscription = Subscription.objects.create(
             business=business,
             plan=plan or get_or_create_plan(business.business_type),
@@ -177,13 +173,11 @@ def check_expired_subscriptions():
         expired_count = expired_qs.update(status="expired")
         Business.objects.filter(id__in=business_ids, is_visible=True).update(is_visible=False)
 
-    # Kesh eskirmasin — bloklangan bizneslar ro'yxatda qolib ketmasligi kerak.
     from common.cache import invalidate_business_cache
     invalidate_business_cache()
 
     logger.info(f"check_expired_subscriptions finished: expired={expired_count}")
     return expired_count
-
 
 
 @transaction.atomic
@@ -307,7 +301,6 @@ def _notify_owner(business, *, title, body, level="info"):
         )
     except Exception as error:  # noqa: BLE001
         logger.warning(f"Egaga xabar yuborilmadi: {error}")
-
 
 
 REMINDER_DAYS = (5, 3, 2)

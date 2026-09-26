@@ -5,18 +5,16 @@ from django.db import transaction
 from django.utils import timezone
 
 from businesses.models import Business, BusinessApplication
-from businesses.tasks import notify_new_application_task
-from common.queue import enqueue
 
 logger = logging.getLogger(__name__)
 
 
 class TrialNotAvailable(Exception):
-    """Bepul sinov allaqachon ishlatilgan — ariza qabul qilinmaydi."""
+    pass
 
 
 class BusinessLimitReached(Exception):
-    """Bitta hisobda bitta biznes — ikkinchisiga ariza qabul qilinmaydi."""
+    pass
 
 
 @transaction.atomic
@@ -77,9 +75,6 @@ def submit_application(*, applicant, business_type, business_name, plan=None):
         f"business_id={business.id}, user_id={applicant.id}, type={business_type} "
         f"(sinov hali boshlanmadi — admin tasdig'i kutilmoqda)"
     )
-    transaction.on_commit(
-        lambda: enqueue(notify_new_application_task, str(application.id))
-    )
     return application, business, subscription
 
 
@@ -92,9 +87,6 @@ def approve_application(*, application, approved_by):
     subscription = getattr(business, "subscription", None) if business is not None else None
     already_subscribed = subscription is not None and subscription.status in ("trial", "active")
 
-    # Tarifsiz (bepul sinov) ariza, lekin sinov ishlatib bo'lingan — tasdiqlasak
-    # joy ommaga chiqadi-yu, obunasiz qoladi. Shuning uchun hech narsani
-    # o'zgartirmasdan to'xtatamiz: admin arizaga tarif biriktirishi kerak.
     if application.plan is None and applicant.has_used_trial and not already_subscribed:
         raise TrialNotAvailable(
             "Bu foydalanuvchi bepul sinovni ishlatib bo'lgan. Arizaga pullik "

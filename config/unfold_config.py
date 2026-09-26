@@ -6,7 +6,6 @@ LOGO_FILE = Path(__file__).resolve().parent.parent / "static" / "images" / "logo
 
 
 def site_logo(request):
-    # Fayl hali qo'yilmagan bo'lsa singan rasm o'rniga SITE_SYMBOL ko'rinadi.
     if not LOGO_FILE.exists():
         return None
     url = static("images/logo.png")
@@ -180,7 +179,6 @@ UNFOLD = {
                 ],
             },
             {
-                # app: businesses
                 "title": "Bizneslar",
                 "separator": True,
                 "collapsible": True,
@@ -194,7 +192,6 @@ UNFOLD = {
                 ],
             },
             {
-                # app: catalog
                 "title": "Katalog",
                 "separator": True,
                 "collapsible": True,
@@ -204,7 +201,6 @@ UNFOLD = {
                 ],
             },
             {
-                # app: reservations
                 "title": "Bronlar",
                 "separator": True,
                 "collapsible": True,
@@ -214,7 +210,6 @@ UNFOLD = {
                 ],
             },
             {
-                # app: reviews
                 "title": "Sharhlar",
                 "separator": True,
                 "collapsible": True,
@@ -224,7 +219,6 @@ UNFOLD = {
                 ],
             },
             {
-                # app: subscriptions
                 "title": "Obunalar",
                 "separator": True,
                 "collapsible": True,
@@ -236,7 +230,6 @@ UNFOLD = {
                 ],
             },
             {
-                # app: content
                 "title": "Kontent",
                 "separator": True,
                 "collapsible": True,
@@ -246,7 +239,6 @@ UNFOLD = {
                 ],
             },
             {
-                # app: common
                 "title": "Sozlamalar",
                 "separator": True,
                 "collapsible": True,

@@ -49,7 +49,6 @@ def remember_reservation_status(sender, instance, **kwargs):
 @_safe
 def notify_on_reservation(sender, instance, created, **kwargs):
     if created:
-        # Yangi bron — JOY EGASIGA xabar: u tasdiqlashi kerak.
         notify(
             instance.business.owner,
             kind=Notification.KIND_RESERVATION,

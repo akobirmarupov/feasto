@@ -22,7 +22,6 @@ def clamp_bits(value) -> int:
 
 
 def level_for(bits: int) -> tuple[str, str, str]:
-    """Baldan daraja: `(kod, nom, ohang)`."""
     bits = clamp_bits(bits)
     for threshold, code, label, tone in TRUST_LEVELS:
         if bits >= threshold:

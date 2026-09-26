@@ -67,8 +67,6 @@ class Business(BaseModel):
     )
 
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="businesses")
-    # RESTRICT: arizani alohida o'chirib bo'lmaydi (aks holda biznes, bronlar va
-    # sharhlar ham o'chib ketardi). Egasi o'chirilganda esa ikkalasi birga ketadi.
     application = models.OneToOneField(BusinessApplication, on_delete=models.RESTRICT, related_name="business")
     name = models.CharField(max_length=200, db_index=True)
     business_type = models.CharField(max_length=15, choices=TYPE_CHOICES, db_index=True)
@@ -163,7 +161,6 @@ class Business(BaseModel):
     PRICING_UNSET = "unset"
 
     def venue_pricing_mode(self) -> str:
-        """To'yxona narxi qaysi rejimda. Restoran uchun har doim UNSET."""
         if self.business_type != self.TYPE_VENUE:
             return self.PRICING_UNSET
         has_packages = any(self.pricings.all())
@@ -238,8 +235,6 @@ class Room(BaseModel):
         return f"{self.business.name} — {self.name}"
 
     def clean(self):
-        # Biznes tanlanmagan bo'lsa, xatoni formaning o'zi "majburiy maydon" deb
-        # ko'rsatadi — bu yerda `self.business` ga tegsak 500 bo'lardi.
         if not self.business_id:
             return
         if self.business.business_type == Business.TYPE_RESTAURANT and not self.deposit_tier:

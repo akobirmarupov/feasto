@@ -9,8 +9,6 @@ from .models import Business, BusinessApplication, BusinessPhoto, Hall, Room, Ve
 
 
 class FilterByBusinessMixin:
-    """Bron formasidagi avtomatik to'ldirish faqat tanlangan biznesning
-    xona/zallarini ko'rsatsin (`?business_id=` JS orqali qo'shiladi)."""
 
     def get_search_results(self, request, queryset, search_term):
         queryset, may_have_duplicates = super().get_search_results(request, queryset, search_term)
@@ -132,8 +130,6 @@ class BusinessApplicationAdmin(ModelAdmin):
         )
         status_changed = change and new_status != previous_status
 
-        # Holat o'zgarishini faqat servis bajaradi (obuna, rol, ko'rinish shunga
-        # bog'liq). Shuning uchun forma avval eski holat bilan saqlanadi.
         if status_changed:
             obj.status = previous_status
         super().save_model(request, obj, form, change)

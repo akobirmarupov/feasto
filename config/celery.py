@@ -20,15 +20,13 @@ app.conf.beat_schedule = {
     },
     "complete-past-reservations": {
         "task": "reservations.tasks.complete_past_reservations_task",
-        "schedule": crontab(hour=4, minute=0),
+        "schedule": crontab(minute="*/15"),
     },
 }
 
 
 @signals.task_prerun.connect
 def reset_platform_settings_memo(**kwargs):
-    # Web'da buni middleware qiladi. Worker'da har bir vazifa oldidan
-    # tozalamasak, admin o'zgartirgan sozlama restartgacha ko'rinmaydi.
     from common.models import _solo_memo
 
     _solo_memo.set(None)

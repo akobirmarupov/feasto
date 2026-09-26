@@ -2,8 +2,8 @@
  * Bron formasi: xona / zal / bo'sh vaqt ro'yxatlari faqat tanlangan
  * biznesga (va xona/zalga) tegishli yozuvlarni ko'rsatsin.
  *
- * Django avtomatik to'ldirish (select2) so'rovlariga `business_id`,
- * `room_id`, `hall_id` parametrlari qo'shiladi — server tomonda
+ * Django avtomatik to'ldirish (select2) so'rovlariga `business_id` va
+ * `room_id` parametrlari qo'shiladi — server tomonda
  * `get_search_results` shu bo'yicha filtrlaydi. Yakuniy tekshiruv baribir
  * modelning `clean()` metodida.
  */
@@ -13,7 +13,7 @@
     var DEPENDENT = {
         room: ["business"],
         hall: ["business"],
-        availability: ["business", "room", "hall"],
+        availability: ["business", "room"],
     };
 
     function value(name) {

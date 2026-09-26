@@ -54,8 +54,11 @@ class PlatformSettings(models.Model):
 
     trial_days = models.PositiveSmallIntegerField(
         default=7, verbose_name="Bepul sinov (kun)",
-        help_text="Yangi biznesga beriladigan bepul sinov muddati. "
-                  "Pullik obuna muddati esa tarif rejasidan olinadi.",
+        help_text="Yangi biznesga beriladigan bepul sinov muddati.",
+    )
+    subscription_days = models.PositiveSmallIntegerField(
+        default=30, verbose_name="Obuna muddati (kun)",
+        help_text="Standart obuna muddati. Aniq muddat tarif rejasidan olinadi.",
     )
 
     class Meta:

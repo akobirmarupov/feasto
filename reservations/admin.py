@@ -13,18 +13,13 @@ from .models import Availability, Reservation
 
 
 def build_businesses_data():
-    """Sahifadagi JS uchun: har bir biznesning turi, xonalari va zallari."""
-    businesses = Business.objects.prefetch_related("rooms", "halls").order_by("name")
+    businesses = Business.objects.prefetch_related("rooms").order_by("name")
     return {
         str(business.id): {
             "type": business.business_type,
             "rooms": [
                 {"id": str(room.id), "name": room.name}
                 for room in sorted(business.rooms.all(), key=lambda item: item.name)
-            ],
-            "halls": [
-                {"id": str(hall.id), "name": f"{hall.name} ({hall.people} kishilik)"}
-                for hall in sorted(business.halls.all(), key=lambda item: item.name)
             ],
         }
         for business in businesses
@@ -33,22 +28,20 @@ def build_businesses_data():
 
 @admin.register(Availability)
 class AvailabilityAdmin(ModelAdmin):
-    list_display = ("business", "room", "hall", "date", "start_time", "end_time", "is_booked")
+    list_display = ("business", "room", "date", "start_time", "end_time", "is_booked")
     list_filter = ("is_booked", "business__business_type", "business", "date")
     list_filter_submit = True
-    list_select_related = ("business", "room", "hall")
-    search_fields = ("business__name", "room__name", "hall__name")
-    autocomplete_fields = ("business", "room", "hall")
+    list_select_related = ("business", "room")
+    search_fields = ("business__name", "room__name")
+    autocomplete_fields = ("business", "room")
     date_hierarchy = "date"
 
     def get_search_results(self, request, queryset, search_term):
         queryset, may_have_duplicates = super().get_search_results(request, queryset, search_term)
 
-        # Bron formasidagi avtomatik to'ldirish: faqat tanlangan joyning bo'sh kunlari.
         filters = {
             "business_id": request.GET.get("business_id"),
             "room_id": request.GET.get("room_id"),
-            "hall_id": request.GET.get("hall_id"),
         }
         filters = {key: value for key, value in filters.items() if value}
         if filters:
@@ -70,7 +63,6 @@ class AvailabilityAdmin(ModelAdmin):
                     created, skipped = Availability.generate_for_months(
                         business=form.cleaned_data["business"],
                         room=form.cleaned_data.get("room"),
-                        halls=form.cleaned_data.get("halls"),
                         start_time=form.cleaned_data["start_time"],
                         end_time=form.cleaned_data["end_time"],
                         months=form.get_month_dates(),
@@ -109,7 +101,6 @@ class AvailabilityAdmin(ModelAdmin):
             "month_choices": MONTH_CHOICES,
             "businesses_data": build_businesses_data(),
             "selected_room": form.data.get("room", "") if form.is_bound else "",
-            "selected_halls": form.data.getlist("halls") if form.is_bound else [],
             "type_restaurant": Business.TYPE_RESTAURANT,
             "type_venue": Business.TYPE_VENUE,
         }
@@ -124,7 +115,6 @@ class AvailabilityAdmin(ModelAdmin):
         )
 
 
-# Qaysi holatdan qaysi holatga o'tish mumkin.
 ALLOWED_TRANSITIONS = {
     "confirmed": ("pending",),
     "cancelled": ("pending", "confirmed"),
@@ -152,7 +142,6 @@ class ReservationAdmin(ModelAdmin):
         return obj.availability.date if obj.availability_id else "—"
 
     def save_model(self, request, obj, form, change):
-        # Depozit kiritilmagan bo'lsa — xona/zal narxidan olinadi.
         if not obj.deposit_amount:
             obj.deposit_amount = obj.resolve_deposit_amount()
         super().save_model(request, obj, form, change)
