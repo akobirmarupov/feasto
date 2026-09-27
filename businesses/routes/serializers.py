@@ -2,12 +2,8 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
 from businesses.models import (
-    Business,
-    BusinessApplication,
-    BusinessPhoto,
-    Hall,
-    Room,
-    VenuePricing,
+    Business, BusinessApplication, BusinessPhoto,
+    Hall, Room, VenuePricing,
 )
 from subscriptions.models import SubscriptionPlan
 
