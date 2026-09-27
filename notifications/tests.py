@@ -573,6 +573,7 @@ class FakeResponse:
 
 
 class TelegramTests(TestCase):
+    @override_settings(TELEGRAM_BOT_TOKEN="", TELEGRAM_ADMIN_CHAT_ID="")
     def test_not_configured_is_noop(self):
         self.assertFalse(telegram.is_configured())
         self.assertFalse(telegram.send_admin_message("salom"))
@@ -627,6 +628,7 @@ class PushTests(TestCase):
     def setUp(self):
         self.user = make_user("ali")
 
+    @override_settings(FCM_SERVICE_ACCOUNT_FILE="", FCM_PROJECT_ID="")
     def test_not_configured_is_noop(self):
         Device.objects.create(user=self.user, token="t1")
         self.assertEqual(push.send_to_user(self.user, title="a", body="b"), 0)

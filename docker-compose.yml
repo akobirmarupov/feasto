@@ -1,0 +1,114 @@
+# ASOSIY (production) konfiguratsiya.
+# Mahalliy ishlash uchun docker-compose.override.yml avtomatik qo'shiladi
+# (bind mount + ochiq portlar). Serverda override QO'SHILMASLIGI kerak:
+#   docker compose -f docker-compose.yml up -d
+
+services:
+
+  # --- Django ilovasi ---
+  web:
+    build: .
+    # command berilmagan — Dockerfile dagi CMD (gunicorn) ishlatiladi.
+    # Migratsiya va collectstatic FAQAT shu konteynerda bajariladi.
+    environment:
+      RUN_MIGRATIONS: "1"
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+      - logs_volume:/app/logs
+    expose:
+      - "8000"
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # --- PostgreSQL ma'lumotlar bazasi ---
+  db:
+    image: postgres:16-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  # --- Redis (kesh, sessiya va Celery broker) ---
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # --- Celery worker ---
+  celery:
+    build: .
+    command: celery -A config worker -l info
+    # Image dagi HEALTHCHECK HTTP port 8000 ni tekshiradi — worker veb-server
+    # emas, shuning uchun o'chiriladi. Worker va beat tirikligini /api/health/
+    # dagi "celery" maydoni ko'rsatadi (heartbeat beat yuboradi, worker bajaradi).
+    healthcheck:
+      disable: true
+    volumes:
+      - media_volume:/app/media
+      - logs_volume:/app/logs
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
+    restart: unless-stopped
+
+  # --- Celery beat (davriy vazifalar). FAQAT BITTA NUSXA ishlashi shart. ---
+  celery-beat:
+    build: .
+    command: celery -A config beat -l info
+    healthcheck:
+      disable: true
+    volumes:
+      - logs_volume:/app/logs
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
+    restart: unless-stopped
+
+  # --- nginx shu yerga qo'shiladi ---
+  # Kerak bo'ladigan ma'lumot:
+  #   proxy_pass  http://web:8000;   (bir tarmoqda, xost nomi = servis nomi)
+  #   /static/  ->  static_volume:/app/staticfiles:ro
+  #   /media/   ->  media_volume:/app/media:ro
+  #   80/443 portlarini faqat nginx chiqaradi, web emas.
+
+volumes:
+  postgres_data:
+  redis_data:
+  static_volume:
+  media_volume:
+  logs_volume:

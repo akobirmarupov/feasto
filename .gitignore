@@ -16,3 +16,7 @@ logs/
 *.log
 staticfiles/
     
+# Celery beat holati (dev rejimida loyiha papkasiga yoziladi)
+celerybeat-schedule
+celerybeat-schedule.*
+celerybeat.pid

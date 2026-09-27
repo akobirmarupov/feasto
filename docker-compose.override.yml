@@ -1,0 +1,32 @@
+# MAHALLIY (development) qo'shimchalari. `docker compose up` da avtomatik
+# qo'shiladi. Serverda ishlatilmaydi — u yerda:
+#   docker compose -f docker-compose.yml up -d
+
+services:
+
+  web:
+    # Kodni host'dan bog'laymiz: o'zgartirish uchun qayta build shart emas.
+    # Loglar host'dagi logs/ papkasida ko'rinib turadi.
+    volumes:
+      - .:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+      - ./logs:/app/logs
+    ports:
+      - "8000:8000"
+
+  celery:
+    volumes:
+      - .:/app
+      - media_volume:/app/media
+      - ./logs:/app/logs
+
+  celery-beat:
+    volumes:
+      - .:/app
+      - ./logs:/app/logs
+
+  db:
+    # Bazaga host'dan DBeaver/psql bilan ulanish uchun. Prodda ochilmaydi.
+    ports:
+      - "5433:5432"
