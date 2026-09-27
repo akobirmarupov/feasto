@@ -5,12 +5,25 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import DatabaseError, IntegrityError
 from django.http import Http404
 from rest_framework import status
+from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
 
 from common.middleware import get_request_id
 
 logger = logging.getLogger("common")
+
+
+class BadRequest(APIException):
+    status_code = status.HTTP_400_BAD_REQUEST
+    default_detail = "Noto'g'ri so'rov."
+    default_code = "bad_request"
+
+
+class Conflict(APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_detail = "Ma'lumotlar ziddiyati."
+    default_code = "conflict"
 
 
 ERROR_CODES = {
@@ -63,7 +76,13 @@ def api_exception_handler(exc, context):
             f"Access denied: view={view_name} status={response.status_code} detail={message}"
         )
 
-    response.data = _payload(response.status_code, message, details)
+    code = None
+    if isinstance(exc, APIException):
+        codes = exc.get_codes()
+        if isinstance(codes, str) and codes != exc.default_code:
+            code = codes
+
+    response.data = _payload(response.status_code, message, details, code=code)
     return response
 
 
@@ -81,11 +100,11 @@ def _extract(detail):
     return str(detail), None
 
 
-def _payload(status_code, message, details=None):
+def _payload(status_code, message, details=None, code=None):
     payload = {
         "success": False,
         "error": {
-            "code": ERROR_CODES.get(status_code, "error"),
+            "code": code or ERROR_CODES.get(status_code, "error"),
             "message": message,
         },
         "request_id": get_request_id(),

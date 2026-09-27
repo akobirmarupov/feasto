@@ -49,6 +49,8 @@ def submit_application(*, applicant, business_type, business_name, plan=None):
 
     if reapply_to is not None:
         business = reapply_to
+        if business.business_type != business_type:
+            _clear_type_specific_data(business)
         business.application = application
         business.name = business_name
         business.business_type = business_type
@@ -76,6 +78,16 @@ def submit_application(*, applicant, business_type, business_name, plan=None):
         f"(sinov hali boshlanmadi — admin tasdig'i kutilmoqda)"
     )
     return application, business, subscription
+
+
+def _clear_type_specific_data(business):
+    business.availabilities.all().delete()
+    business.rooms.all().delete()
+    business.halls.all().delete()
+    business.pricings.all().delete()
+    business.restaurant_menu_items.all().delete()
+    business.venue_menu_items.all().delete()
+    logger.info(f"Business type changed on reapply, old data cleared: business_id={business.id}")
 
 
 @transaction.atomic

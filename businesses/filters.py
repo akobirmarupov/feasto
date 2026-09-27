@@ -18,14 +18,14 @@ class BusinessFilter(filters.FilterSet):
         fields = ["business_type", "is_visible", "district", "cuisine"]
 
     def filter_search(self, queryset, name, value):
-        value = value.strip()
-        if not value:
-            return queryset
-        return queryset.filter(
-            Q(name__icontains=value)
-            | Q(address__icontains=value)
-            | Q(district__icontains=value)
-        )
+        words = [w for w in value.split() if w][:6]
+        for word in words:
+            queryset = queryset.filter(
+                Q(name__icontains=word)
+                | Q(address__icontains=word)
+                | Q(district__icontains=word)
+            )
+        return queryset
 
     def filter_guests(self, queryset, name, value):
         if "max_capacity" not in queryset.query.annotations:

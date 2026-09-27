@@ -1,0 +1,16 @@
+[Unit]
+Description=Feasto Celery beat (faqat BITTA nusxa ishlashi shart)
+After=network.target redis.service
+
+[Service]
+User=feasto
+Group=www-data
+WorkingDirectory=/srv/feasto
+EnvironmentFile=/srv/feasto/.env
+ExecStart=/srv/feasto/venv/bin/celery -A config beat -l info --pidfile=/run/feasto/beat.pid
+RuntimeDirectory=feasto
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

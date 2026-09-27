@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.decorators import action
 
-from .models import Business, BusinessApplication, BusinessPhoto, Hall, Room, VenuePricing
+from .models import Business, BusinessApplication, BusinessPhoto, Favorite, Hall, Room, VenuePricing
 
 
 class FilterByBusinessMixin:
@@ -194,3 +194,11 @@ class BusinessPhotoAdmin(ModelAdmin):
     list_select_related = ("business",)
     search_fields = ("business__name",)
     autocomplete_fields = ("business",)
+
+
+@admin.register(Favorite)
+class FavoriteAdmin(ModelAdmin):
+    list_display = ("user", "business", "created_at")
+    search_fields = ("user__username", "business__name")
+    autocomplete_fields = ("user", "business")
+    readonly_fields = ("created_at",)

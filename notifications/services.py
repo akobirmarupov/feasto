@@ -14,6 +14,9 @@ def notify(user, *, title, kind=Notification.KIND_SYSTEM, body="", link_url="",
         title=title[:160], body=body[:400], link_url=link_url[:300],
     )
     logger.info(f"Notification created: user_id={user.pk}, kind={kind}")
+    from notifications.push import schedule_push
+
+    schedule_push(notification)
     return notification
 
 
@@ -33,4 +36,9 @@ def notify_many(users, **kwargs):
         )
         for user in users
     ]
-    return Notification.objects.bulk_create(rows)
+    created = Notification.objects.bulk_create(rows)
+    from notifications.push import schedule_push
+
+    for notification in created:
+        schedule_push(notification)
+    return created

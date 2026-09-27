@@ -6,6 +6,8 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from notifications import links
+
 logger = logging.getLogger("reservations")
 
 BATCH_SIZE = 500
@@ -63,7 +65,7 @@ def _ask_for_review(reservation, notify, Notification):
             title="Tashrifingiz qanday o'tdi?",
             body=f"{reservation.business.name} — bahoingizni qoldiring, "
                  f"bu boshqa mijozlarga tanlashda yordam beradi.",
-            link_url="/bronlarim/",
+            link_url=links.CUSTOMER_RESERVATIONS,
         )
     except Exception as error:  # noqa: BLE001
         logger.warning(f"Sharh so'rovi yuborilmadi (bron {reservation.pk}): {error}")

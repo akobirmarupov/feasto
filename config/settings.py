@@ -216,6 +216,8 @@ SPECTACULAR_SETTINGS = {
         "ReservationStatusEnum": "reservations.models.Reservation.STATUS_CHOICES",
         "SubscriptionStatusEnum": "subscriptions.models.Subscription.STATUS_CHOICES",
         "ApprovalStatusEnum": "businesses.models.BusinessApplication.STATUS_CHOICES",
+        "FeedbackKindEnum": "common.models.Feedback.KIND_CHOICES",
+        "NotificationKindEnum": "notifications.models.Notification.KIND_CHOICES",
     },
 }
 
@@ -308,6 +310,17 @@ GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID", default="")
 
 GOOGLE_CLIENT_SECRET = config("GOOGLE_CLIENT_SECRET", default="")
 
+# Google redirect oqimi tokenlarni shu (frontend) kirish sahifasiga URL fragmenti bilan qaytaradi.
+FRONTEND_LOGIN_URL = config("FRONTEND_LOGIN_URL", default="/kirish/")
+
+# Telegram: yangi ariza / bron / obuna so'rovi / taklif haqida admin guruhiga xabar.
+TELEGRAM_BOT_TOKEN = config("TELEGRAM_BOT_TOKEN", default="")
+TELEGRAM_ADMIN_CHAT_ID = config("TELEGRAM_ADMIN_CHAT_ID", default="")
+
+# Push (Firebase Cloud Messaging, HTTP v1). Bo'sh bo'lsa push yuborilmaydi.
+FCM_SERVICE_ACCOUNT_FILE = config("FCM_SERVICE_ACCOUNT_FILE", default="")
+FCM_PROJECT_ID = config("FCM_PROJECT_ID", default="")
+
 
 LANGUAGE_CODE = "uz"
 TIME_ZONE = "Asia/Tashkent"
@@ -347,6 +360,21 @@ if config("USE_S3", default=False, cast=bool):
 EMAIL_BACKEND = config(
     "EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend"
 )
+
+
+SENTRY_DSN = config("SENTRY_DSN", default="")
+if SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.celery import CeleryIntegration
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[DjangoIntegration(), CeleryIntegration()],
+        environment=config("SENTRY_ENVIRONMENT", default="production" if not DEBUG else "development"),
+        traces_sample_rate=config("SENTRY_TRACES_SAMPLE_RATE", default=0.1, cast=float),
+        send_default_pii=False,
+    )
 
 
 LOG_DIR = BASE_DIR / "logs"

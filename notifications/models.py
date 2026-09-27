@@ -71,3 +71,26 @@ class Notification(BaseModel):
         self.is_read = True
         self.read_at = timezone.now()
         self.save(update_fields=["is_read", "read_at"])
+
+
+class Device(BaseModel):
+    PLATFORM_CHOICES = (
+        ("android", "Android"),
+        ("ios", "iOS"),
+        ("web", "Web"),
+    )
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="devices")
+    token = models.CharField(max_length=512, unique=True, verbose_name="Push token (FCM)")
+    platform = models.CharField(max_length=10, choices=PLATFORM_CHOICES, default="android")
+    is_active = models.BooleanField(default=True, db_index=True)
+    last_seen_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        verbose_name = "Qurilma"
+        verbose_name_plural = "Qurilmalar"
+        ordering = ["-last_seen_at"]
+        indexes = [models.Index(fields=["user", "is_active"], name="idx_device_user_active")]
+
+    def __str__(self):
+        return f"{self.user_id} — {self.platform} — {self.token[:12]}…"

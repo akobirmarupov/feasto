@@ -127,13 +127,23 @@ class Business(BaseModel):
     def __str__(self):
         return self.name
 
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        instance._loaded_map_link = instance.map_link if "map_link" in field_names else None
+        return instance
+
     def save(self, *args, **kwargs):
         update_fields = kwargs.get("update_fields")
-        if self.map_link and (update_fields is None or "map_link" in update_fields):
+        link_changed = self.map_link != getattr(self, "_loaded_map_link", None)
+        no_coordinates = not self.latitude and not self.longitude
+        touches_link = update_fields is None or "map_link" in update_fields
+        if self.map_link and touches_link and (link_changed or no_coordinates):
             self._fill_coordinates_from_link()
             if update_fields is not None:
                 kwargs["update_fields"] = set(update_fields) | {"latitude", "longitude"}
         super().save(*args, **kwargs)
+        self._loaded_map_link = self.map_link
 
     def _fill_coordinates_from_link(self):
         from common.maps import coordinates_from_link
@@ -334,3 +344,19 @@ class VenuePricing(BaseModel):
             return
         if self.business.business_type != Business.TYPE_VENUE:
             raise ValidationError("Taom paketi narxi faqat to'yxonalar uchun belgilanadi.")
+
+
+class Favorite(BaseModel):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="favorites")
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name="favorited_by")
+
+    class Meta:
+        verbose_name = "Sevimli"
+        verbose_name_plural = "Sevimlilar"
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["user", "business"], name="uniq_favorite_user_business"),
+        ]
+
+    def __str__(self):
+        return f"{self.user} ♥ {self.business}"

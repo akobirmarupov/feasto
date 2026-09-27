@@ -9,6 +9,15 @@ from drf_spectacular.views import (
 )
 
 api_patterns = [
+    path("", include("account.urls")),
+    path("", include("common.urls")),
+    path("", include("businesses.urls")),
+    path("", include("catalog.urls")),
+    path("", include("reservations.urls")),
+    path("", include("reviews.urls")),
+    path("", include("subscriptions.urls")),
+    path("", include("content.urls")),
+    path("", include("notifications.urls")),
 ]
 
 urlpatterns = [

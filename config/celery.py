@@ -22,6 +22,10 @@ app.conf.beat_schedule = {
         "task": "reservations.tasks.complete_past_reservations_task",
         "schedule": crontab(minute="*/15"),
     },
+    "celery-heartbeat": {
+        "task": "common.tasks.heartbeat_task",
+        "schedule": crontab(minute="*"),
+    },
 }
 
 

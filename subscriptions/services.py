@@ -4,6 +4,8 @@ from datetime import timedelta
 from django.db import transaction
 from django.utils import timezone
 
+from notifications import links
+from notifications.telegram import notify_admins
 from subscriptions.models import PaymentLog, Subscription, SubscriptionPlan
 
 logger = logging.getLogger(__name__)
@@ -46,8 +48,10 @@ def start_trial(*, business):
             "Bu foydalanuvchi bepul sinovni allaqachon ishlatgan."
         )
 
+    from common.models import PlatformSettings
+
     plan = get_or_create_plan(business.business_type)
-    trial_ends_at = timezone.now() + timedelta(days=plan.trial_days)
+    trial_ends_at = timezone.now() + timedelta(days=PlatformSettings.get_solo().trial_days)
 
     subscription, _ = Subscription.objects.update_or_create(
         business=business,
@@ -95,7 +99,8 @@ def activate_subscription(*, business, approved_by, amount=None, note="", plan=N
             trial_ends_at=timezone.now(),
         )
 
-    fields = ["status", "subscription_ends_at", "approved_by"]
+    fields = ["status", "subscription_ends_at", "approved_by", "reminded_days"]
+    subscription.reminded_days = []
     if plan is not None and plan.pk != subscription.plan_id:
         subscription.plan = plan
         fields.append("plan")
@@ -221,7 +226,12 @@ def _notify_staff_about_request(request):
             kind=Notification.KIND_SUBSCRIPTION,
             title="Obunani uzaytirish arizasi",
             body=f"{request.business.name} — {request.plan.duration_label}, {request.price:,.0f} so'm".replace(",", " "),
-            link_url="/boshqaruv/obunalar/",
+            link_url=links.ADMIN_SUBSCRIPTION_REQUESTS,
+        )
+        notify_admins(
+            f"<b>Obunani uzaytirish arizasi</b>\n{request.business.name} — "
+            f"{request.plan.duration_label}, {request.price:,.0f} so'm\n"
+            f"Egasi: {request.business.owner.full_name} {request.business.owner.phone_number or ''}".replace(",", " ")
         )
     except Exception as error:  # noqa: BLE001
         logger.warning(f"Obuna arizasi haqida xabar yuborilmadi: {error}")
@@ -296,7 +306,7 @@ def _notify_owner(business, *, title, body, level="info"):
             kind=Notification.KIND_SUBSCRIPTION,
             title=title,
             body=body,
-            link_url="/panel/obuna/",
+            link_url=links.OWNER_SUBSCRIPTION,
             level=level,
         )
     except Exception as error:  # noqa: BLE001
