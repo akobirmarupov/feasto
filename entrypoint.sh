@@ -7,9 +7,17 @@ DB_WAIT_TIMEOUT="${DB_WAIT_TIMEOUT:-60}"
 deadline=$((SECONDS + DB_WAIT_TIMEOUT))
 
 echo "Ma'lumotlar bazasi tayyor bo'lishini kutyapmiz..."
-until python manage.py showmigrations > /dev/null 2>&1; do
+until last_error=$(python manage.py showmigrations 2>&1 > /dev/null); do
+  # Sozlama xatosi (masalan SECRET_KEY, ALLOWED_HOSTS) kutish bilan tuzalmaydi —
+  # darhol to'xtaymiz va sababini ko'rsatamiz.
+  if echo "$last_error" | grep -q "ImproperlyConfigured"; then
+    echo "XATO: sozlamalarda muammo bor, baza bilan bog'liq emas:" >&2
+    echo "$last_error" | tail -n 3 >&2
+    exit 1
+  fi
   if [ "$SECONDS" -ge "$deadline" ]; then
     echo "XATO: baza ${DB_WAIT_TIMEOUT} sekund ichida javob bermadi (DB_HOST=${DB_HOST:-?})." >&2
+    echo "$last_error" | tail -n 3 >&2
     exit 1
   fi
   sleep 1

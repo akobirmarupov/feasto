@@ -1,9 +1,0 @@
-[Unit]
-Description=Feasto zaxira nusxasi — har kuni 04:00
-
-[Timer]
-OnCalendar=*-*-* 04:00:00
-Persistent=true
-
-[Install]
-WantedBy=timers.target

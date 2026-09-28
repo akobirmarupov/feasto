@@ -15,7 +15,13 @@ ENV/
 logs/
 *.log
 staticfiles/
-    
+
+# Let's Encrypt sertifikatlari va hisob kalitlari — maxfiy, git'ga tushmaydi
+deploy/nginx/certbot/conf/*
+!deploy/nginx/certbot/conf/.gitkeep
+deploy/nginx/certbot/www/*
+!deploy/nginx/certbot/www/.gitkeep
+
 # Celery beat holati (dev rejimida loyiha papkasiga yoziladi)
 celerybeat-schedule
 celerybeat-schedule.*

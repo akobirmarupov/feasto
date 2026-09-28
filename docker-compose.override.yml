@@ -26,6 +26,12 @@ services:
       - .:/app
       - ./logs:/app/logs
 
+  nginx:
+    # Mahalliy kompyuterda 80-port band, shuning uchun 8080. !override bo'lmasa
+    # compose ro'yxatlarni qo'shib yuboradi va 80 ham ochilishga urinadi.
+    ports: !override
+      - "8080:80"
+
   db:
     # Bazaga host'dan DBeaver/psql bilan ulanish uchun. Prodda ochilmaydi.
     ports:

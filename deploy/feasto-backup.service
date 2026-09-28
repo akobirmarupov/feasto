@@ -1,7 +1,0 @@
-[Unit]
-Description=Feasto zaxira nusxasi
-
-[Service]
-Type=oneshot
-User=feasto
-ExecStart=/srv/feasto/deploy/backup.sh
